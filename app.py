@@ -157,6 +157,6 @@ else:
         # Получаем изображение птицы
         bird_image = get_bird_image(species)
         if bird_image:
-            st.image(bird_image, caption=f"Изображение {species}", use_column_width=True)
+            st.image(bird_image, caption="American Robin")
         else:
             st.write("Изображение не найдено.")
