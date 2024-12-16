@@ -39,7 +39,6 @@ def get_bird_info(species_code):
             return response.json()
         else:
             st.error(f"Не удалось получить информацию о птице. Статус: {response.status_code}")
-            st.error(f"Ответ: {response.text}")
     except Exception as e:
         st.error(f"Ошибка при запросе данных: {e}")
     return None
@@ -64,16 +63,10 @@ def get_bird_image(bird_name):
             if "thumbnail" in page_data:
                 return page_data["thumbnail"]["source"]
             else:
-                if "missing" in page_data:
-                    st.warning(f"Страница не найдена для '{bird_name}'.")
-                else:
-                    st.warning(f"Изображение не найдено для '{bird_name}'.")
                 return None
     except requests.RequestException as e:
-        st.error(f"Ошибка сети при обращении к WikiMedia API: {e}")
         return None
     except Exception as e:
-        st.error(f"Неизвестная ошибка: {e}")
         return None
 
 # Функция для отслеживания динамики
@@ -167,12 +160,12 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
     return df_result.style.apply(color_rows, axis=1)
 
 # Функция сброса фильтров
-def reset_filters():
-    st.session_state.species = "Все"
-    st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
-    st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
-    st.session_state.start_date = st.session_state.min_date
-    st.session_state.end_date = st.session_state.max_date
+# def reset_filters():
+    # st.session_state.species = "Все"
+    # st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
+    # st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
+    # st.session_state.start_date = st.session_state.min_date
+    # st.session_state.end_date = st.session_state.max_date
 
 # Загружаем данные
 file_path = "./top_30.csv"
@@ -183,20 +176,20 @@ required_columns = {"latitude", "longitude", "common_name", "primary_label", "da
 if not required_columns.issubset(data.columns):
     st.error(f"Файл {file_path} должен содержать следующие столбцы: {', '.join(required_columns)}")
 else:
-    # Инициализация значений в session_state
-    if 'species' not in st.session_state:
-        st.session_state.species = "Все"
-    if 'lat_range' not in st.session_state:
-        st.session_state.min_lat, st.session_state.max_lat = data["latitude"].min(), data["latitude"].max()
-        st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
-    if 'lon_range' not in st.session_state:
-        st.session_state.min_lon, st.session_state.max_lon = data["longitude"].min(), data["longitude"].max()
-        st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
-    if 'start_date' not in st.session_state:
-        st.session_state.min_date, st.session_state.max_date = pd.to_datetime(data['date']).min(), pd.to_datetime(data['date']).max()
-        st.session_state.start_date = st.session_state.min_date
-    if 'end_date' not in st.session_state:
-        st.session_state.end_date = st.session_state.max_date
+    # # Инициализация значений в session_state
+    # if 'species' not in st.session_state:
+    #     st.session_state.species = "Все"
+    # if 'lat_range' not in st.session_state:
+    #     st.session_state.min_lat, st.session_state.max_lat = data["latitude"].min(), data["latitude"].max()
+    #     st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
+    # if 'lon_range' not in st.session_state:
+    #     st.session_state.min_lon, st.session_state.max_lon = data["longitude"].min(), data["longitude"].max()
+    #     st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
+    # if 'start_date' not in st.session_state:
+    #     st.session_state.min_date, st.session_state.max_date = pd.to_datetime(data['date']).min(), pd.to_datetime(data['date']).max()
+    #     st.session_state.start_date = st.session_state.min_date
+    # if 'end_date' not in st.session_state:
+    #     st.session_state.end_date = st.session_state.max_date
 
     unique_species = data["common_name"].unique()
     species_colors = {species: random_color() for species in unique_species}
@@ -206,32 +199,66 @@ else:
     st.title("Интерактивная карта птиц")
     st.write("На карте показано распределение птиц по широте и долготе.")
 
-     # Виджет выбора вида птиц
-    species = st.sidebar.selectbox("Вид птицы", options=["Все"] + list(unique_species), index=list(unique_species).index(st.session_state.species) if st.session_state.species != "Все" else 0)
-    st.session_state.species = species
+    # Виджет выбора вида птиц
+    # species_options = ["Все"] + list(unique_species)
+    # current_species_index = species_options.index(st.session_state.species) if st.session_state.species in species_options else 0
+    # species = st.sidebar.selectbox("Вид птицы", options=species_options, index=current_species_index)
+
+    # # Виджет выбора широты и долготы
+    # lat_range = st.sidebar.slider("Диапазон широты", st.session_state.min_lat, st.session_state.max_lat, st.session_state.lat_range)
+    # st.session_state.lat_range = lat_range
+    # lon_range = st.sidebar.slider("Диапазон долготы", st.session_state.min_lon, st.session_state.max_lon, st.session_state.lon_range)
+    # st.session_state.lon_range = lon_range
+
+    # # Виджет выбора даты
+    # start_date = st.sidebar.date_input("Начало периода", st.session_state.start_date, min_value=st.session_state.min_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
+    # st.session_state.start_date = start_date
+    # end_date = st.sidebar.date_input("Конец периода", st.session_state.end_date, min_value=start_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
+    # st.session_state.end_date = end_date
+
+    # Виджет выбора вида птиц
+    species = st.sidebar.selectbox("Вид птицы", options=["Все"] + list(unique_species))
+    filtered_data = data if species == "Все" else data[data["common_name"] == species]
 
     # Виджет выбора широты и долготы
-    lat_range = st.sidebar.slider("Диапазон широты", st.session_state.min_lat, st.session_state.max_lat, st.session_state.lat_range)
-    st.session_state.lat_range = lat_range
-    lon_range = st.sidebar.slider("Диапазон долготы", st.session_state.min_lon, st.session_state.max_lon, st.session_state.lon_range)
-    st.session_state.lon_range = lon_range
-
-    # Виджет выбора даты
-    start_date = st.sidebar.date_input("Начало периода", st.session_state.start_date, min_value=st.session_state.min_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
-    st.session_state.start_date = start_date
-    end_date = st.sidebar.date_input("Конец периода", st.session_state.end_date, min_value=start_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
-    st.session_state.end_date = end_date
-
-    # Кнопка для сброса фильтров
-    #if st.sidebar.button("Сбросить фильтры"):
-        #reset_filters()
-
-    # Фильтрация данных
-    filtered_data = data if species == "Все" else data[data["common_name"] == species]
+    min_lat, max_lat = data["latitude"].min(), data["latitude"].max()
+    min_lon, max_lon = data["longitude"].min(), data["longitude"].max()
+    lat_range = st.sidebar.slider("Диапазон широты", min_lat, max_lat, (min_lat, max_lat))
+    lon_range = st.sidebar.slider("Диапазон долготы", min_lon, max_lon, (min_lon, max_lon))
     filtered_data = filtered_data[(filtered_data["latitude"] >= lat_range[0]) & (filtered_data["latitude"] <= lat_range[1]) &
                                    (filtered_data["longitude"] >= lon_range[0]) & (filtered_data["longitude"] <= lon_range[1])]
+
+    # Виджет выбора даты
+    min_date, max_date = pd.to_datetime(data['date']).min(), pd.to_datetime(data['date']).max()
+    start_date = st.sidebar.date_input("Начало периода", min_date, min_value=min_date, max_value=max_date, format="DD.MM.YYYY")
+    end_date = st.sidebar.date_input("Конец периода", max_date, min_value=start_date, max_value=max_date, format="DD.MM.YYYY")
     filtered_data = filtered_data[(pd.to_datetime(filtered_data['date']) >= pd.to_datetime(start_date)) & 
                                    (pd.to_datetime(filtered_data['date']) <= pd.to_datetime(end_date))]
+    # Кнопка для сброса фильтров
+    # if st.sidebar.button("Сбросить фильтры"):
+    #     reset_filters()
+
+    # Фильтрация по виду птицы
+    if species != "Все":
+        filtered_data = filtered_data[
+            filtered_data["common_name"].str.strip().str.lower() == species.strip().lower()
+        ]
+
+    # Фильтрация по широте и долготе
+    filtered_data = filtered_data[
+        (filtered_data["latitude"] >= lat_range[0]) & 
+        (filtered_data["latitude"] <= lat_range[1]) &
+        (filtered_data["longitude"] >= lon_range[0]) & 
+        (filtered_data["longitude"] <= lon_range[1])
+    ]
+
+    # Преобразование столбца 'date' в datetime и фильтрация по дате
+    filtered_data['date'] = pd.to_datetime(filtered_data['date'], errors='coerce')  # Преобразование с обработкой ошибок
+    filtered_data = filtered_data.dropna(subset=['date'])  # Удаляем записи с некорректными датами
+    filtered_data = filtered_data[
+        (filtered_data['date'] >= pd.to_datetime(start_date)) & 
+        (filtered_data['date'] <= pd.to_datetime(end_date))
+    ]
 
     # Pydeck визуализация
     if not filtered_data.empty:
