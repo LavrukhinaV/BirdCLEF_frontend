@@ -4,18 +4,13 @@ import pydeck as pdk
 import requests
 import ast
 import random
-import datetime
-
-# Заголовок страницы
-st.set_page_config(page_title="Интерактивная карта птиц", layout="wide")
 
 # API eBird
 EBIRD_API_URL = "https://api.ebird.org/v2/ref/taxonomy/ebird"
 EBIRD_API_KEY = "nusv3bd5ltqk"
 
-# Генерация случайного цвета
-def random_color(alpha=160):
-    return [random.randint(0, 255) for _ in range(3)] + [alpha]
+# Заголовок страницы
+st.set_page_config(page_title="Интерактивная карта птиц", layout="wide")
 
 # Загрузка данных из CSV
 @st.cache_data
@@ -28,6 +23,10 @@ def load_data(file_path):
     except FileNotFoundError:
         st.error(f"Файл {file_path} не найден. Проверьте путь и повторите попытку.")
         return pd.DataFrame()
+
+# Генерация случайного цвета
+def random_color(alpha=160):
+    return [random.randint(0, 255) for _ in range(3)] + [alpha]
 
 # Получение информации о птице через eBird API
 def get_bird_info(species_code):
@@ -107,19 +106,19 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
 
     # Группировка по годам для всех видов
     df_total_records = df_filtered.groupby(df_filtered['date'].dt.year).agg({'latitude': 'count'}).reset_index()
-    df_total_records.columns = ["year", "number_of_records_in_database"]
+    df_total_records.columns = ["Год", "Общее количество записей"]
 
     # Фильтрация данных для конкретного вида
     df_bird = df_filtered[df_filtered['primary_label'] == bird]
     df_bird_records = df_bird.groupby(df_bird['date'].dt.year).agg({'latitude': 'count'}).reset_index()
-    df_bird_records.columns = ["year", "records_of_the_bird"]
+    df_bird_records.columns = ["Год", "Количество записей вида"]
 
     # Объединение данных
-    df_result = pd.merge(df_total_records, df_bird_records, on='year', how='left').fillna(0)
-    df_result['records_of_the_bird'] = df_result['records_of_the_bird'].astype(int)
+    df_result = pd.merge(df_total_records, df_bird_records, on='Год', how='left').fillna(0)
+    df_result['Количество записей вида'] = df_result['Количество записей вида'].astype(int)
 
     # Рассчёт относительной частоты записей (единиц на тысячу записей)
-    df_result['frequency'] = df_result['records_of_the_bird'] / df_result['number_of_records_in_database'] * 1000
+    df_result['Частота'] = df_result['Количество записей вида'] / df_result['Общее количество записей'] * 1000
 
     # Скользящее среднее и риск вымирания
     min_records_in_database = 40
@@ -127,23 +126,23 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
     threshold_drop_in_counts = 0.7
     threshold_drop_in_frequency = 0.8
 
-    df_result['mov_avg_total'] = df_result['number_of_records_in_database'].rolling(3, min_periods=1).mean()
-    df_result['mov_avg_bird'] = df_result['records_of_the_bird'].rolling(3, min_periods=1).mean()
-    df_result['mov_avg_frequency'] = df_result['frequency'].rolling(3, min_periods=1).mean()
+    df_result['Скользящее среднее (всего)'] = df_result['Общее количество записей'].rolling(3, min_periods=1).mean()
+    df_result['Скользящее среднее (вида)'] = df_result['Количество записей вида'].rolling(3, min_periods=1).mean()
+    df_result['Скользящее среднее (частота)'] = df_result['Частота'].rolling(3, min_periods=1).mean()
 
-    df_result['risk_of_exstinction'] = 'Нет данных'
+    df_result['Уровень риска вымирания'] = 'Нет данных'
     for i in range(len(df_result)):
-        if (df_result.loc[i, 'mov_avg_total'] >= min_records_in_database) and \
-           (df_result.loc[i, 'mov_avg_bird'] >= min_mov_avg_or_bird_counts):
-            if (df_result.loc[i, 'records_of_the_bird'] / df_result.loc[i, 'mov_avg_bird'] <= threshold_drop_in_counts) or \
-               (df_result.loc[i, 'frequency'] / df_result.loc[i, 'mov_avg_frequency'] <= threshold_drop_in_frequency):
-                if (df_result.loc[i, 'records_of_the_bird'] / df_result.loc[i, 'mov_avg_bird'] <= threshold_drop_in_counts) and \
-                   (df_result.loc[i, 'frequency'] / df_result.loc[i, 'mov_avg_frequency'] <= threshold_drop_in_frequency):
-                    df_result.loc[i, 'risk_of_exstinction'] = 'Высокий'
+        if (df_result.loc[i, 'Скользящее среднее (всего)'] >= min_records_in_database) and \
+           (df_result.loc[i, 'Скользящее среднее (вида)'] >= min_mov_avg_or_bird_counts):
+            if (df_result.loc[i, 'Количество записей вида'] / df_result.loc[i, 'Скользящее среднее (вида)'] <= threshold_drop_in_counts) or \
+               (df_result.loc[i, 'Частота'] / df_result.loc[i, 'Скользящее среднее (частота)'] <= threshold_drop_in_frequency):
+                if (df_result.loc[i, 'Количество записей вида'] / df_result.loc[i, 'Скользящее среднее (вида)'] <= threshold_drop_in_counts) and \
+                   (df_result.loc[i, 'Частота'] / df_result.loc[i, 'Скользящее среднее (частота)'] <= threshold_drop_in_frequency):
+                    df_result.loc[i, 'Уровень риска вымирания'] = 'Высокий'
                 else:
-                    df_result.loc[i, 'risk_of_exstinction'] = 'Средний'
+                    df_result.loc[i, 'Уровень риска вымирания'] = 'Средний'
             else:
-                df_result.loc[i, 'risk_of_exstinction'] = 'Низкий'
+                df_result.loc[i, 'Уровень риска вымирания'] = 'Низкий'
 
     # Применение стилей
     def color_rows(row):
@@ -153,19 +152,11 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
             'Низкий': 'background-color: lightgreen;',
             'Средний': 'background-color: yellow;',
             'Высокий': 'background-color: lightcoral;'
-        }.get(row['risk_of_exstinction'], '')
+        }.get(row['Уровень риска вымирания'], '')
         return [color] * len(row)
 
-    # Перед стилизацией возвращаем весь датафрейм (без удаления столбца 'risk_of_exstinction')
+    # Перед стилизацией возвращаем весь датафрейм
     return df_result.style.apply(color_rows, axis=1)
-
-# Функция сброса фильтров
-# def reset_filters():
-    # st.session_state.species = "Все"
-    # st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
-    # st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
-    # st.session_state.start_date = st.session_state.min_date
-    # st.session_state.end_date = st.session_state.max_date
 
 # Загружаем данные
 file_path = "./top_30.csv"
@@ -176,21 +167,6 @@ required_columns = {"latitude", "longitude", "common_name", "primary_label", "da
 if not required_columns.issubset(data.columns):
     st.error(f"Файл {file_path} должен содержать следующие столбцы: {', '.join(required_columns)}")
 else:
-    # # Инициализация значений в session_state
-    # if 'species' not in st.session_state:
-    #     st.session_state.species = "Все"
-    # if 'lat_range' not in st.session_state:
-    #     st.session_state.min_lat, st.session_state.max_lat = data["latitude"].min(), data["latitude"].max()
-    #     st.session_state.lat_range = (st.session_state.min_lat, st.session_state.max_lat)
-    # if 'lon_range' not in st.session_state:
-    #     st.session_state.min_lon, st.session_state.max_lon = data["longitude"].min(), data["longitude"].max()
-    #     st.session_state.lon_range = (st.session_state.min_lon, st.session_state.max_lon)
-    # if 'start_date' not in st.session_state:
-    #     st.session_state.min_date, st.session_state.max_date = pd.to_datetime(data['date']).min(), pd.to_datetime(data['date']).max()
-    #     st.session_state.start_date = st.session_state.min_date
-    # if 'end_date' not in st.session_state:
-    #     st.session_state.end_date = st.session_state.max_date
-
     unique_species = data["common_name"].unique()
     species_colors = {species: random_color() for species in unique_species}
     data["color"] = data["common_name"].map(species_colors)
@@ -198,23 +174,6 @@ else:
     # Основной заголовок
     st.title("Интерактивная карта птиц")
     st.write("На карте показано распределение птиц по широте и долготе.")
-
-    # Виджет выбора вида птиц
-    # species_options = ["Все"] + list(unique_species)
-    # current_species_index = species_options.index(st.session_state.species) if st.session_state.species in species_options else 0
-    # species = st.sidebar.selectbox("Вид птицы", options=species_options, index=current_species_index)
-
-    # # Виджет выбора широты и долготы
-    # lat_range = st.sidebar.slider("Диапазон широты", st.session_state.min_lat, st.session_state.max_lat, st.session_state.lat_range)
-    # st.session_state.lat_range = lat_range
-    # lon_range = st.sidebar.slider("Диапазон долготы", st.session_state.min_lon, st.session_state.max_lon, st.session_state.lon_range)
-    # st.session_state.lon_range = lon_range
-
-    # # Виджет выбора даты
-    # start_date = st.sidebar.date_input("Начало периода", st.session_state.start_date, min_value=st.session_state.min_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
-    # st.session_state.start_date = start_date
-    # end_date = st.sidebar.date_input("Конец периода", st.session_state.end_date, min_value=start_date, max_value=st.session_state.max_date, format="DD.MM.YYYY")
-    # st.session_state.end_date = end_date
 
     # Виджет выбора вида птиц
     species = st.sidebar.selectbox("Вид птицы", options=["Все"] + list(unique_species))
@@ -234,9 +193,6 @@ else:
     end_date = st.sidebar.date_input("Конец периода", max_date, min_value=start_date, max_value=max_date, format="DD.MM.YYYY")
     filtered_data = filtered_data[(pd.to_datetime(filtered_data['date']) >= pd.to_datetime(start_date)) & 
                                    (pd.to_datetime(filtered_data['date']) <= pd.to_datetime(end_date))]
-    # Кнопка для сброса фильтров
-    # if st.sidebar.button("Сбросить фильтры"):
-    #     reset_filters()
 
     # Фильтрация по виду птицы
     if species != "Все":
@@ -282,7 +238,7 @@ else:
         )
         st.pydeck_chart(r)
         
-        # Статистика под картой
+        # Статистика
         st.subheader("Статистика наблюдений")
         total_observations = len(filtered_data)
         unique_species_count = filtered_data["common_name"].nunique()
@@ -295,15 +251,19 @@ else:
         }
 
         stats_df = pd.DataFrame(stats_data)
-        st.table(stats_df)
-        
+        st.markdown(stats_df.style.hide(axis="index").to_html(), unsafe_allow_html=True)
+
+        # Отступ
+        placeholder = st.empty()
+        placeholder.write("")
+
         # Проверка: выбран ли конкретный вид птицы
         selected_bird = species != "Все"
 
         if selected_bird:
             st.subheader(f"Динамика наблюдений и риск вымирания для: {species}")
 
-            # Получение кода птицы (предполагается, что 'primary_label' содержит уникальный идентификатор)
+            # Получение кода птицы
             bird_code = filtered_data[filtered_data["common_name"] == species]["primary_label"].iloc[0]
 
             # Вызов bird_dynamics
