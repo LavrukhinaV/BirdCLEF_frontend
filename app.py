@@ -70,7 +70,7 @@ def get_bird_image(bird_name):
 
 # Функция для отслеживания динамики
 def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitude_min=-90, latitude_max=90,
-                  start_date=None, end_date=None):
+                  start_date=None, end_date=None, selected_seasons=None):
     """
     Функция выдает датафрейм с динамикой количества записей конкретного вида птиц с учетом фильтров по локации и периоду.
     Возвращает стилизованный датафрейм, где строки закрашены в цвет уровня риска.
@@ -94,6 +94,10 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
             df = df[df['date'] >= start_date]
         if end_date:
             df = df[df['date'] <= end_date]
+
+    # Фильтрация по сезонам
+    if selected_seasons:
+        df = df[df['season'].isin(selected_seasons)]
 
     # Проверка наличия данных после фильтрации
     if df.empty:
@@ -194,11 +198,34 @@ else:
     filtered_data = filtered_data[(pd.to_datetime(filtered_data['date']) >= pd.to_datetime(start_date)) & 
                                    (pd.to_datetime(filtered_data['date']) <= pd.to_datetime(end_date))]
 
+    # Виджет выбора сезона
+    selected_seasons = st.sidebar.multiselect(
+        "Сезон",
+        options=["Зима", "Весна", "Лето", "Осень"],
+        default=["Весна", "Лето", "Осень", "Зима"],
+        placeholder="Выберите сезоны"
+    )
+    
+     # Словарь соответствий между русскими и английскими названиями сезонов
+    season_translation = {
+        "Зима": "Winter",
+        "Весна": "Spring",
+        "Лето": "Summer",
+        "Осень": "Fall"
+    }
+
     # Фильтрация по виду птицы
     if species != "Все":
         filtered_data = filtered_data[
             filtered_data["common_name"].str.strip().str.lower() == species.strip().lower()
         ]
+
+    # Преобразуем выбранные пользователем сезоны в английские
+    selected_seasons_english = [season_translation[season] for season in selected_seasons]
+
+    # Фильтрация данных по выбранным сезонам
+    if selected_seasons_english:
+        filtered_data = filtered_data[filtered_data['season'].isin(selected_seasons_english)]
 
     # Фильтрация по широте и долготе
     filtered_data = filtered_data[
@@ -276,6 +303,7 @@ else:
                 latitude_max=lat_range[1],
                 start_date=start_date,
                 end_date=end_date,
+                selected_seasons=selected_seasons_english,
             )
 
             if df_bird_dynamics is not None:
