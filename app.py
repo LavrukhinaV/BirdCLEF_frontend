@@ -69,6 +69,7 @@ def get_bird_image(bird_name):
         return None
 
 # Функция для отслеживания динамики
+# правки поверх файла Виктории 18.12.2024
 def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitude_min=-90, latitude_max=90,
                   start_date=None, end_date=None, selected_seasons=None):
     """
@@ -130,23 +131,48 @@ def bird_dynamics(df, bird='', longitude_left=-180, longitude_right=180, latitud
     threshold_drop_in_counts = 0.7
     threshold_drop_in_frequency = 0.8
 
-    df_result['Скользящее среднее (всего)'] = df_result['Общее количество записей'].rolling(3, min_periods=1).mean()
-    df_result['Скользящее среднее (вида)'] = df_result['Количество записей вида'].rolling(3, min_periods=1).mean()
-    df_result['Скользящее среднее (частота)'] = df_result['Частота'].rolling(3, min_periods=1).mean()
-
+    # служебные переменные и словари для дальнейшего анализа
+    first_year = df_result['Год'].min()
+    last_year = df_result['Год'].max()
+    dict_total = df_result.set_index('Год')['Общее количество записей'].to_dict()
+    dict_bird = df_result.set_index('Год')['Количество записей вида'].to_dict()
+    # заполнение в словаре данных по пропущенным годам
+    for i in range(first_year, last_year + 1):
+        if dict_total.get(i) is None:
+            dict_total[i] = 0
+            dict_bird[i] = 0
+    years_list = list(df_result['Год'])
+    # создаем колонки для дальнейшего заполнения со значениями по умолчанию
+    df_result['Скользящее среднее (всего)'] = df_result['Общее количество записей'].astype(float)
+    df_result['Скользящее среднее (вида)'] = df_result['Количество записей вида'].astype(float)
+    df_result['Скользящее среднее (частота)'] = df_result['Частота']
     df_result['Уровень риска вымирания'] = 'Нет данных'
-    for i in range(len(df_result)):
-        if (df_result.loc[i, 'Скользящее среднее (всего)'] >= min_records_in_database) and \
-           (df_result.loc[i, 'Скользящее среднее (вида)'] >= min_mov_avg_or_bird_counts):
-            if (df_result.loc[i, 'Количество записей вида'] / df_result.loc[i, 'Скользящее среднее (вида)'] <= threshold_drop_in_counts) or \
-               (df_result.loc[i, 'Частота'] / df_result.loc[i, 'Скользящее среднее (частота)'] <= threshold_drop_in_frequency):
-                if (df_result.loc[i, 'Количество записей вида'] / df_result.loc[i, 'Скользящее среднее (вида)'] <= threshold_drop_in_counts) and \
-                   (df_result.loc[i, 'Частота'] / df_result.loc[i, 'Скользящее среднее (частота)'] <= threshold_drop_in_frequency):
-                    df_result.loc[i, 'Уровень риска вымирания'] = 'Высокий'
+    # заполняем колонки результирующего датафрейма (цикл по всем строкам)
+    for i in range(df_result.shape[0]):
+        if i < 2: # для первых двух строк средневзвешенные не считаются
+            df_result.loc[i,['Скользящее среднее (всего)']] = 0
+            df_result.loc[i,['Скользящее среднее (вида)']] = 0
+            df_result.loc[i,['Скользящее среднее (частота)']] = 0
+        else:
+            year_number = df_result.loc[i]['Год']
+            # считаем средневзвешенные за 3 года
+            df_result.loc[i,['Скользящее среднее (всего)']] = (dict_total[year_number] + dict_total[year_number-1] + dict_total[year_number-2]) / 3
+            ma_birds = (dict_bird[year_number] + dict_bird[year_number-1] + dict_bird[year_number-2]) / 3
+            df_result.loc[i,['Скользящее среднее (вида)']] = ma_birds
+            ma_frequency = df_result.loc[i]['Скользящее среднее (вида)'] / df_result.loc[i]['Скользящее среднее (всего)'] * 1000
+            df_result.loc[i,['Скользящее среднее (частота)']] = ma_frequency
+            # оцениваем показатель риска - проверяем на пробитие порогов
+            if (dict_total[year_number] >= min_records_in_database) and (ma_birds >= min_mov_avg_or_bird_counts):
+                if dict_bird[year_number] / ma_birds <= threshold_drop_in_counts:
+                    if df_result.loc[i]['Частота'] / ma_frequency <= threshold_drop_in_frequency:
+                        df_result.loc[i,['Уровень риска вымирания']] = 'Высокий'
+                    else:
+                        df_result.loc[i,['Уровень риска вымирания']] = 'Средний'
                 else:
-                    df_result.loc[i, 'Уровень риска вымирания'] = 'Средний'
-            else:
-                df_result.loc[i, 'Уровень риска вымирания'] = 'Низкий'
+                    if df_result.loc[i]['Частота'] / ma_frequency <= threshold_drop_in_frequency:
+                        df_result.loc[i,['Уровень риска вымирания']] = 'Средний'
+                    else:
+                        df_result.loc[i,['Уровень риска вымирания']] = 'Низкий'
 
     # Применение стилей
     def color_rows(row):
